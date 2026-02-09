@@ -1,65 +1,59 @@
 import requests
 import json
+import os
+from dotenv import load_dotenv
 
-# --- CONFIGURACIÓN DE META (Sacá esto de la web de developers) ---
-# 1. El Token larguísimo que empieza con EAA...
-TOKEN = "EAAVl9jv0l9EBQtFQfSWBqW7blVBnYG3oFxGfj65QAbtqQ6YmByFzLtLKYpUagrHY3iiYU6tTXalEedYMbLoG7Qghj6gMeK73yfD9ZB9qUIvmcCoTZCCtHMvmSzsH3t4zt2xIWzdH1Ii7E64SKZC5jClu3UjcfZB3VfMAytc8fykPR8pXtjU5EtVB6mkVlQZDZD"
+# Cargar variables de entorno (para cuando corrés en local)
+load_dotenv()
 
-# 2. El "Identificador del número de teléfono" (Phone Number ID)
-PHONE_ID = "948544151679718"
-
-# 3. Tu número verificado (Al que le llega el mensaje)
-# Formato: 54 + 9 + codigo + numero (Ej: 549264xxxxxxx)
-NUMERO_DESTINO = "54264154517903" 
+# --- CONFIGURACIÓN DE META (Leída desde variables de entorno) ---
+TOKEN = os.getenv("META_TOKEN")
+PHONE_ID = os.getenv("META_PHONE_ID")
+NUMERO_DESTINO = os.getenv("META_RECIPIENT_PHONE")
 
 def enviar_mensaje(texto):
     """
     Envía un mensaje de texto usando la API Oficial de WhatsApp (Meta).
-    Doc: https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages
     """
+    # Verificación de seguridad básica
+    if not TOKEN or not PHONE_ID or not NUMERO_DESTINO:
+        print("❌ ERROR: Faltan configurar las variables de entorno de Meta.")
+        return False
+
     print(f"📨 Enviando mensaje a Meta...")
     
-    # URL Oficial de la API (v17.0 o superior)
     url = f"https://graph.facebook.com/v17.0/{PHONE_ID}/messages"
     
-    # Cabeceras de seguridad (Authorization)
     headers = {
         "Authorization": f"Bearer {TOKEN}",
         "Content-Type": "application/json"
     }
     
-    # El cuerpo del mensaje (JSON)
-    # Meta es estricto con esta estructura. No le erres a las llaves.
     payload = {
         "messaging_product": "whatsapp",
         "to": NUMERO_DESTINO,
         "type": "text",
         "text": {
             "body": texto,
-            "preview_url": True # Permite ver una miniatura si mandás un link
+            "preview_url": True
         }
     }
     
     try:
-        # Hacemos el POST
         respuesta = requests.post(url, headers=headers, data=json.dumps(payload))
-        
-        # Analizamos qué pasó
         datos_respuesta = respuesta.json()
         
         if respuesta.status_code == 200:
             print("✅ ¡Mensaje entregado a Meta!")
-            # print(datos_respuesta) # Descomentá si querés ver el ID del mensaje
             return True
         else:
             print(f"❌ Error de Meta: {respuesta.status_code}")
-            print(datos_respuesta) # Esto te dice QUÉ falló (ej: token vencido)
+            print(datos_respuesta)
             return False
             
     except Exception as e:
         print(f"❌ Error de conexión fatal: {e}")
         return False
 
-# Prueba unitaria
 if __name__ == "__main__":
-    enviar_mensaje("🤖 *Hola Dev!* Esta es la API Oficial de Meta funcionando. 🚀")
+    enviar_mensaje("🤖 *Hola Dev!* Prueba de seguridad exitosa. 🔐")
