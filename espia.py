@@ -51,15 +51,31 @@ def limpiar_precio(texto_sucio):
 def run_bot():
     print("🤖 INICIANDO VIBE TRAVEL BOT - MODO MULTI-DESTINO")
     
-    # --- CONFIGURACIÓN CHROME (MODO NUBE) ---
+    # --- CONFIGURACIÓN CHROME (MODO NUBE CAMUFLADO) ---
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless") # No abrir ventana gráfica
-    options.add_argument("--no-sandbox") # Necesario para permisos de servidor
-    options.add_argument("--disable-dev-shm-usage") # Evita crasheos por memoria compartida
-    options.add_argument("--disable-gpu") 
-    options.add_argument("--window-size=1920,1080") # Simula monitor grande
+    options.add_argument("--headless") # No abrir ventana
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    
+    # 🎭 EL DISFRAZ (Clave para que no nos bloqueen)
+    # 1. User-Agent: Decimos que somos un Windows 10 común y corriente
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    options.add_argument(f"user-agent={user_agent}")
+    
+    # 2. Idioma: Decimos que hablamos Español de Argentina (importante para los precios)
+    options.add_argument("--lang=es-AR")
+    
+    # 3. Ocultar que es automatizado (Truco avanzado)
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    
+    # Ejecutar script para engañar a las protecciones de JavaScript
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     
     mensajes_alerta = [] 
 
@@ -72,6 +88,10 @@ def run_bot():
             print(f"    URL: {url[:60]}...")
             
             driver.get(url)
+            print(f"   👀 Título de la página: {driver.title}")
+            # ------------------------------
+
+            print("⏳ Cargando página... (Esperando 10s por seguridad)")
             
             # --- MEJORA 1: Espera fija de seguridad ---
             # Le damos 10 segundos al servidor de GitHub para que renderice todo
