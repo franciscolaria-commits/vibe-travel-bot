@@ -1,0 +1,115 @@
+
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>VibeTravel Dashboard ✈️</title>
+        <style>
+            body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+            
+            .header { text-align: center; margin-bottom: 30px; }
+            .header h1 { color: #1a1a1a; margin: 0; font-size: 1.8rem; }
+            .header p { color: #666; font-size: 0.9em; }
+            
+            .container { 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+                gap: 20px; 
+                max-width: 1200px; 
+                margin: 0 auto; 
+            }
+            
+            /* Hacemos que el link no parezca un link azul feo */
+            a { text-decoration: none; color: inherit; display: block; }
+            
+            .card { 
+                background: white; 
+                border-radius: 15px; 
+                padding: 20px; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+                transition: transform 0.2s, box-shadow 0.2s;
+                border-left: 5px solid #ccc;
+                position: relative; /* Para acomodar etiquetas */
+            }
+            
+            /* Efecto al pasar el mouse: se levanta y brilla */
+            .card:hover { 
+                transform: translateY(-5px); 
+                box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+                cursor: pointer;
+            }
+            
+            .card.winner { border-left-color: #00c851; background: linear-gradient(to right, #e8f5e9, #fff); }
+            .card.expensive { border-left-color: #ff4444; }
+            
+            .destination { font-size: 1.4em; font-weight: 800; color: #333; display: flex; justify-content: space-between; align-items: center; }
+            .price { font-size: 2.2em; font-weight: 900; color: #2e7d32; margin: 10px 0; }
+            .date { font-size: 0.75em; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+            .cta { font-size: 0.8em; color: #007bff; font-weight: bold; margin-top: 10px; display: block; }
+            
+            .badge { 
+                padding: 5px 10px; 
+                border-radius: 20px; 
+                font-size: 0.6em; 
+                font-weight: bold; 
+                color: white; 
+                text-transform: uppercase;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+            .badge-win { background-color: #00c851; }
+            
+            .footer { text-align: center; margin-top: 50px; color: #aaa; font-size: 0.9em; font-weight: 500; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>✈️ Tablero de Vuelos de Mamá</h1>
+            <p>Salida: MENDOZA (MDZ) | Última actualización: 09/02/2026 17:01</p>
+        </div>
+        
+        <div class="container">
+    
+        <a href="https://www.turismocity.com.ar/vuelos-baratos-a-BCN-Barcelona_Intl?currency=USD&flexDates=true&from=MDZ" target="_blank">
+            <div class="card winner">
+                <div class="destination">BARCELONA <span class="badge badge-win">🏆 MEJOR OPCIÓN</span></div>
+                <div class="price">$1,032</div>
+                <div class="date">Visto el: 2026-02-09 16:44:26</div>
+                <span class="cta">¡COMPRAR YA! 🔥</span>
+            </div>
+        </a>
+        
+        <a href="https://www.turismocity.com.ar/vuelos-baratos-a-MAD-Barajas?currency=USD&flexDates=true&from=MDZ" target="_blank">
+            <div class="card normal">
+                <div class="destination">MADRID </div>
+                <div class="price">$1,037</div>
+                <div class="date">Visto el: 2026-02-09 16:44:11</div>
+                <span class="cta">Ver oferta ></span>
+            </div>
+        </a>
+        
+        <a href="https://www.turismocity.com.ar/vuelos-baratos-a-ROM-Roma_Italia?currency=USD&flexDates=true&from=MDZ" target="_blank">
+            <div class="card normal">
+                <div class="destination">ROMA </div>
+                <div class="price">$1,147</div>
+                <div class="date">Visto el: 2026-02-09 16:44:19</div>
+                <span class="cta">Ver oferta ></span>
+            </div>
+        </a>
+        
+        <a href="https://www.turismocity.com.ar/vuelos-baratos-a-PAR-Paris_Francia?currency=USD&flexDates=true&from=MDZ" target="_blank">
+            <div class="card normal">
+                <div class="destination">PARIS </div>
+                <div class="price">$1,251</div>
+                <div class="date">Visto el: 2026-02-09 16:44:50</div>
+                <span class="cta">Ver oferta ></span>
+            </div>
+        </a>
+        
+        </div>
+        <div class="footer">
+            <p>Generado por Vibe Bot by Fran 🤖</p>
+        </div>
+    </body>
+    </html>
+    
