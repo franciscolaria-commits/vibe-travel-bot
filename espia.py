@@ -9,8 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- 1. CONFIGURACIÓN DE LA MISIÓN (Acá pegás tus 5 URLs) ---
-# Usamos una lista de diccionarios. Es la forma PRO de organizar datos.
+# --- 1. CONFIGURACIÓN DE LA MISIÓN ---
 VUELOS_TARGET = [
     {
         "ciudad": "MADRID",
@@ -34,7 +33,7 @@ VUELOS_TARGET = [
     }
 ]
 
-# --- 2. FILTROS (Lógica de Negocio) ---
+# --- 2. FILTROS ---
 MESES_PROHIBIDOS = ["JULIO", "JUL", "DICIEMBRE", "DIC", "DECEMBER", "JULY"]
 
 def limpiar_precio(texto_sucio):
@@ -48,97 +47,94 @@ def limpiar_precio(texto_sucio):
     except ValueError:
         return 99999999
 
-def es_mes_valido(texto_fecha):
-    """
-    Analiza si el texto (ej: 'Enero 2025') cae en meses prohibidos.
-    Retorna True si podemos viajar, False si es fecha prohibida.
-    """
-    if not texto_fecha: return True # Ante la duda, dejamos pasar
-    texto = texto_fecha.upper()
-    
-    for mes_malo in MESES_PROHIBIDOS:
-        if mes_malo in texto:
-            return False # Encontró un mes prohibido
-    return True
-
 # --- 3. EL ROBOT ---
 def run_bot():
     print("🤖 INICIANDO VIBE TRAVEL BOT - MODO MULTI-DESTINO")
+    
+    # --- CONFIGURACIÓN CHROME (MODO NUBE) ---
     options = webdriver.ChromeOptions()
-    # Estas opciones son OBLIGATORIAS para que corra en GitHub Actions
     options.add_argument("--headless") # No abrir ventana gráfica
     options.add_argument("--no-sandbox") # Necesario para permisos de servidor
     options.add_argument("--disable-dev-shm-usage") # Evita crasheos por memoria compartida
-    options.add_argument("--disable-gpu") # Ahorra recursos
-    options.add_argument("--window-size=1920,1080") # Simula un monitor grande para que la web cargue bien
+    options.add_argument("--disable-gpu") 
+    options.add_argument("--window-size=1920,1080") # Simula monitor grande
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
-    mensajes_alerta = [] # Acá vamos acumulando las buenas noticias
+    mensajes_alerta = [] 
 
     try:
-        # BUCLE PRINCIPAL: Recorremos cada destino de la lista
         for objetivo in VUELOS_TARGET:
             ciudad = objetivo["ciudad"]
             url = objetivo["url"]
             
             print(f"\n✈️  Destino: {ciudad} (Saliendo de MDZ)")
-            print(f"    URL: {url[:60]}...") # Mostramos solo el principio para no ensuciar
+            print(f"    URL: {url[:60]}...")
             
             driver.get(url)
             
-            # Esperamos a que cargue algo de precios
-            try:
-                WebDriverWait(driver, 15).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "chart-price-text"))
-                )
-            except:
-                print(f"⚠️  Timeout esperando gráfico en {ciudad}. Saltando...")
-                continue # Pasa al siguiente destino sin romper todo
+            # --- MEJORA 1: Espera fija de seguridad ---
+            # Le damos 10 segundos al servidor de GitHub para que renderice todo
+            print("⏳ Cargando página... (Esperando 10s por seguridad)")
+            time.sleep(10) 
 
-            # Capturamos precios Y FECHAS
-            # OJO: En la vista de barras, a veces el mes está en un 'tooltip' o eje X.
-            # Por ahora, vamos a scrapear el precio mínimo general del gráfico.
-            # (Para filtrar por mes exacto necesitamos inspeccionar el eje X, 
-            #  probemos primero capturar el precio global).
-            
-            elementos_precios = driver.find_elements(By.CLASS_NAME, "chart-price-text")
             precios_validos = []
-            
-            for el in elementos_precios:
-                precio_limpio = limpiar_precio(el.get_attribute("textContent"))
-                if precio_limpio > 1000: # Filtro anti-basura (por si lee un 0)
-                    precios_validos.append(precio_limpio)
-            
+
+            # --- ESTRATEGIA 1: Buscar en el Gráfico de Barras ---
+            try:
+                barras = driver.find_elements(By.CLASS_NAME, "chart-price-text")
+                for el in barras:
+                    p = limpiar_precio(el.get_attribute("textContent"))
+                    if p > 1000: precios_validos.append(p)
+                
+                if precios_validos:
+                    print(f"   📊 Estrategia 1 (Gráfico) encontró: {len(precios_validos)} precios.")
+            except Exception as e:
+                print(f"   ⚠️ Falló lectura de gráfico: {e}")
+
+            # --- ESTRATEGIA 2: Buscar en la lista de tarjetas (Plan B) ---
+            # Si el gráfico falló o no cargó, buscamos abajo en la lista
             if not precios_validos:
-                print(f"❌ No encontré precios para {ciudad}.")
+                print("   🔍 Intentando Estrategia 2 (Lista de tarjetas)...")
+                try:
+                    # Busca cualquier texto que tenga un signo '$'
+                    elementos_lista = driver.find_elements(By.XPATH, "//span[contains(text(), '$')]")
+                    
+                    for el in elementos_lista:
+                        texto = el.get_attribute("textContent")
+                        p = limpiar_precio(texto)
+                        # Filtramos precios para evitar leer basura (ej: $100)
+                        if p > 100000 and p < 10000000: 
+                            precios_validos.append(p)
+                            
+                    print(f"   📋 Estrategia 2 (Lista) encontró: {len(precios_validos)} precios.")
+                except Exception as e:
+                    print(f"   ⚠️ Falló lectura de lista: {e}")
+
+            # Si después de las dos estrategias no hay nada, saltamos
+            if not precios_validos:
+                print(f"❌ FALLÓ TOTALMENTE: No pude leer ningún precio para {ciudad}.")
                 continue
 
+            # --- PROCESAMIENTO ---
             mejor_precio_hoy = min(precios_validos)
             print(f"💰 Mejor precio detectado hoy: ${mejor_precio_hoy:,}")
 
-            # --- CEREBRO: Comparar con Historia ---
-            # Asumimos "MES FLEXIBLE" en la BD por ahora
             base_de_datos.guardar_precio("MDZ", ciudad, "FLEXIBLE", mejor_precio_hoy)
-            
             min_historico = base_de_datos.obtener_mejor_precio_historico(ciudad)
             
-            # Lógica de Oportunidad (Gatillo)
-            # Si el precio de hoy es IGUAL o MENOR al histórico, es candidato
+            # Lógica de Oportunidad
             if mejor_precio_hoy <= min_historico:
                 print("🔥 ¡OJO! Está en su mínimo histórico.")
                 mensajes_alerta.append(f"✅ *{ciudad}*: ${mejor_precio_hoy:,} (Récord!)")
             
-            # Pequeña pausa para no saturar al navegador
             time.sleep(2)
 
         # --- REPORTE FINAL ---
-        # Si juntamos alertas de varios destinos, mandamos UN SOLO mensaje
         if mensajes_alerta:
             print("\n🚨 MANDANDO RESUMEN A MAMÁ...")
             cuerpo_mensaje = "\n".join(mensajes_alerta)
             texto_ws = f"🤖 *VibeTravel Report* ✈️\nOrigen: Mendoza\n\n{cuerpo_mensaje}\n\n¡Entrá a la web para ver fechas!"
-            
             notificador.enviar_mensaje(texto_ws)
         else:
             print("\n💤 Nada interesante hoy en ningún destino.")
@@ -149,5 +145,4 @@ def run_bot():
         driver.quit()
 
 if __name__ == "__main__":
-    # Asegurate que base_de_datos.py tenga la conexión a TiDB configurada
     run_bot()
