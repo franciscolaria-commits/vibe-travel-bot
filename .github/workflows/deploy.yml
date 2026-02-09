@@ -1,0 +1,51 @@
+name: VibeTravel Bot & Web
+
+on:
+  schedule:
+    - cron: '0 13,21 * * *' # Corre a las 10AM y 6PM hora Arg aprox
+  workflow_dispatch: # Permite correrlo manual con un botón
+
+permissions:
+  contents: write # Permiso vital para que el bot pueda actualizar tu web
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Bajar código
+      uses: actions/checkout@v3
+
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Instalar librerías
+      run: |
+        pip install selenium webdriver-manager mysql-connector-python requests python-dotenv
+
+    - name: 🕵️ Ejecutar Espía (Llena la BD y avisa por WhatsApp)
+      env:
+        DB_HOST: ${{ secrets.DB_HOST }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_PORT: ${{ secrets.DB_PORT }}
+        META_TOKEN: ${{ secrets.META_TOKEN }}
+        META_PHONE_ID: ${{ secrets.META_PHONE_ID }}
+        META_RECIPIENT_PHONE: ${{ secrets.META_RECIPIENT_PHONE }}
+      run: python espia.py
+
+    - name: 🎨 Generar Web (Crea index.html actualizado)
+      env:
+        DB_HOST: ${{ secrets.DB_HOST }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_PORT: ${{ secrets.DB_PORT }}
+      run: python generador_web.py
+
+    - name: 🚀 Publicar en GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./ # Publica la carpeta raíz donde está index.html
