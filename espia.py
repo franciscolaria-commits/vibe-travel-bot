@@ -64,10 +64,13 @@ def es_mes_valido(texto_fecha):
 # --- 3. EL ROBOT ---
 def run_bot():
     print("🤖 INICIANDO VIBE TRAVEL BOT - MODO MULTI-DESTINO")
-    
     options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")
-    # options.add_argument("--headless") # Descomentar para producción en GitHub
+    # Estas opciones son OBLIGATORIAS para que corra en GitHub Actions
+    options.add_argument("--headless") # No abrir ventana gráfica
+    options.add_argument("--no-sandbox") # Necesario para permisos de servidor
+    options.add_argument("--disable-dev-shm-usage") # Evita crasheos por memoria compartida
+    options.add_argument("--disable-gpu") # Ahorra recursos
+    options.add_argument("--window-size=1920,1080") # Simula un monitor grande para que la web cargue bien
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
