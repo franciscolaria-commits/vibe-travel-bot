@@ -2,8 +2,8 @@ import base_de_datos
 import notificador
 import os
 import time
-import random # <--- NUEVO: Para tiempos humanos
-import re     # <--- NUEVO: Para leer el título
+import random
+import re
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- 1. CONFIGURACIÓN DE LA MISIÓN ---
+# --- 1. CONFIGURACIÓN ---
 VUELOS_TARGET = [
     { "ciudad": "MADRID", "url": "https://www.turismocity.com.ar/vuelos-baratos-a-MAD-Barajas?currency=USD&flexDates=true&from=MDZ" },
     { "ciudad": "ROMA", "url": "https://www.turismocity.com.ar/vuelos-baratos-a-ROM-Roma_Italia?currency=USD&flexDates=true&from=MDZ" },
@@ -31,11 +31,10 @@ def limpiar_precio(texto_sucio):
     except ValueError:
         return 99999999
 
-# --- 3. EL ROBOT ---
+# --- 2. EL ROBOT ---
 def run_bot():
-    print("🤖 INICIANDO VIBE TRAVEL BOT - MODO ANTI-CLOUDFLARE 🛡️")
+    print("🤖 INICIANDO VIBE TRAVEL BOT - PROTOCOLO F5 🔄")
     
-    # --- CONFIGURACIÓN CHROME CAMUFLADO ---
     options = webdriver.ChromeOptions()
     options.add_argument("--headless") 
     options.add_argument("--no-sandbox")
@@ -43,19 +42,17 @@ def run_bot():
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     
-    # Disfraz de Humano
-    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    # User Agent Rotativo (Básico)
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
     options.add_argument(f"user-agent={user_agent}")
     options.add_argument("--lang=es-AR")
     
-    # Trucos para ocultar que es automatizado
+    # Evasión de detección
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    
-    # Truco JavaScript extra para ocultar Selenium
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     
     mensajes_alerta = [] 
@@ -65,88 +62,93 @@ def run_bot():
             ciudad = objetivo["ciudad"]
             url = objetivo["url"]
             
-            # PAUSA HUMANIZADA ENTRE CIUDADES (Para no saturar y parecer humano)
-            tiempo_espera = random.uniform(3, 7)
-            print(f"\n💤 Descansando {tiempo_espera:.1f}s antes de ir a {ciudad}...")
-            time.sleep(tiempo_espera)
+            # Descanso aleatorio
+            sleep_time = random.uniform(5, 10)
+            print(f"\n💤 Descansando {sleep_time:.1f}s antes de atacar {ciudad}...")
+            time.sleep(sleep_time)
 
             print(f"✈️  Destino: {ciudad}")
             driver.get(url)
             
-            # --- LÓGICA ANTI-BLOQUEO "JUST A MOMENT" ---
+            # --- LÓGICA DE EVASIÓN REFORZADA (REFRESH) ---
             titulo = driver.title
+            
+            # Si nos frena Cloudflare...
             if "Just a moment" in titulo or "Attention Required" in titulo:
-                print("🛡️ Cloudflare nos frenó. Esperando 15s a que nos deje pasar...")
-                time.sleep(15) # Esperamos a que la sala de espera nos redirija automáticamente
-                titulo = driver.title # Volvemos a leer el título
+                print("🛡️ ¡ALERTA! Cloudflare detectado.")
+                print("   ⏳ Esperando 5s antes de contraatacar...")
+                time.sleep(5)
+                
+                print("   🔄 ¡REFRESCANDO PÁGINA (F5)!...")
+                driver.refresh() # <--- EL SECRETO: Recargar suele validar la sesión
+                
+                print("   ⏳ Esperando 20s a que nos dejen pasar...")
+                time.sleep(20) # Le damos tiempo de sobra
+                titulo = driver.title # Volvemos a leer
             
             print(f"   👀 Título Final: {titulo}")
             
             precios_validos = []
             
-            # ESTRATEGIA 0: El Título (La más efectiva)
+            # 1. INTENTO POR TÍTULO
             try:
-                # Busca patrones como "USD 1.200" o "$1200" o "USD1200" en el título de la pestaña
                 match = re.search(r'(?:USD|\$)\s*([\d\.]+)', titulo)
                 if match:
-                    precio_str = match.group(1).replace('.', '')
-                    precio_titulo = int(precio_str)
-                    if precio_titulo > 500: 
-                        precios_validos.append(precio_titulo)
-                        print(f"   🎯 Estrategia 0 (Título) encontró: ${precio_titulo}")
-            except Exception as e:
-                print(f"   ⚠️ Error leyendo título: {e}")
+                    p = int(match.group(1).replace('.', ''))
+                    if p > 500: 
+                        precios_validos.append(p)
+                        print(f"   🎯 Título cantó el precio: ${p}")
+            except: pass
 
-            # Si el título falló, cargamos la web completa
+            # 2. INTENTO POR HTML (Si el título falló)
             if not precios_validos:
-                print("⏳ Título sin precio. Cargando web completa (Esperando 8s)...")
-                time.sleep(8) 
-
-                # ESTRATEGIA 1: Gráfico
-                try:
-                    barras = driver.find_elements(By.CLASS_NAME, "chart-price-text")
-                    for el in barras:
-                        p = limpiar_precio(el.get_attribute("textContent"))
-                        if p > 500: precios_validos.append(p)
-                    if barras: print(f"   📊 Estrategia 1 (Gráfico) encontró precios.")
-                except: pass
-
-                # ESTRATEGIA 2: Lista (Plan C)
-                if not precios_validos:
+                if "Just a moment" not in titulo: # Solo buscamos si pasamos el filtro
+                    print("   🔎 Buscando en el contenido HTML...")
                     try:
-                        lista = driver.find_elements(By.XPATH, "//span[contains(text(), '$') or contains(text(), 'USD')]")
-                        for el in lista:
+                        # Buscamos en Gráfico
+                        barras = driver.find_elements(By.CLASS_NAME, "chart-price-text")
+                        for el in barras:
                             p = limpiar_precio(el.get_attribute("textContent"))
-                            if p > 500 and p < 10000000: precios_validos.append(p)
-                        if lista: print(f"   📋 Estrategia 2 (Lista) buscó precios.")
+                            if p > 500: precios_validos.append(p)
+                        
+                        # Buscamos en Lista
+                        if not precios_validos:
+                            lista = driver.find_elements(By.XPATH, "//span[contains(text(), '$')]")
+                            for el in lista:
+                                p = limpiar_precio(el.get_attribute("textContent"))
+                                if p > 500 and p < 10000000: precios_validos.append(p)
                     except: pass
+                else:
+                    print("   ❌ Seguimos bloqueados. Saltando...")
 
             if not precios_validos:
-                print(f"❌ FALLÓ: Cloudflare ganó esta ronda en {ciudad}.")
+                print(f"❌ FALLÓ: No pudimos obtener precio de {ciudad}.")
                 continue
 
-            # --- PROCESAMIENTO ---
-            mejor_precio_hoy = min(precios_validos)
-            print(f"💰 MEJOR PRECIO FINAL: ${mejor_precio_hoy:,}")
+            # --- ÉXITO ---
+            mejor = min(precios_validos)
+            print(f"💰 PRECIO CONFIRMADO: ${mejor:,}")
 
-            base_de_datos.guardar_precio("MDZ", ciudad, "FLEXIBLE", mejor_precio_hoy)
-            min_historico = base_de_datos.obtener_mejor_precio_historico(ciudad)
+            base_de_datos.guardar_precio("MDZ", ciudad, "FLEXIBLE", mejor)
+            min_hist = base_de_datos.obtener_mejor_precio_historico(ciudad)
             
-            if mejor_precio_hoy <= min_historico:
-                print("🔥 ¡RÉCORD HISTÓRICO!")
-                mensajes_alerta.append(f"✅ *{ciudad}*: ${mejor_precio_hoy:,}")
+            if mejor <= min_hist:
+                mensajes_alerta.append(f"✅ *{ciudad}*: ${mejor:,}")
 
-        # --- REPORTE FINAL ---
+        # --- NOTIFICACIÓN ---
         if mensajes_alerta:
-            print("\n🚨 MANDANDO NOTIFICACIÓN...")
+            print("\n🚨 PREPARANDO NOTIFICACIÓN...")
             cuerpo = "\n".join(mensajes_alerta)
-            texto = f"🤖 *VibeTravel Report* ✈️\nOrigen: Mendoza\n\n{cuerpo}\n\n¡Mirá la web para más detalles!"
-            notificador.enviar_mensaje(texto)
+            texto = f"🤖 *VibeTravel* ✈️\n\n{cuerpo}\n\nLink: https://franciscolaria-commits.github.io/vibe-travel-bot/"
+            try:
+                notificador.enviar_mensaje(texto)
+            except:
+                print("❌ Falló el envío de WhatsApp (Revisar token/número)")
         else:
-            print("\n💤 Nada interesante hoy.")
+            print("\n💤 Precios estables. Sin novedades.")
 
     except Exception as e:
-        print(f"🔥 Error Crítico: {e}")
+        print(f"🔥 Error General: {e}")
     finally:
         driver.quit()
 
