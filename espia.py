@@ -1,6 +1,7 @@
 import base_de_datos
 import notificador
 import os
+import re
 import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -85,68 +86,70 @@ def run_bot():
             url = objetivo["url"]
             
             print(f"\n✈️  Destino: {ciudad} (Saliendo de MDZ)")
-            print(f"    URL: {url[:60]}...")
             
             driver.get(url)
-            print(f"   👀 Título de la página: {driver.title}")
-            # ------------------------------
-
-            print("⏳ Cargando página... (Esperando 10s por seguridad)")
             
-            # --- MEJORA 1: Espera fija de seguridad ---
-            # Le damos 10 segundos al servidor de GitHub para que renderice todo
-            print("⏳ Cargando página... (Esperando 10s por seguridad)")
-            time.sleep(10) 
-
+            # --- DEBUG Y ESTRATEGIA 0 (EL TÍTULO) ---
+            titulo = driver.title
+            print(f"   👀 Título detectado: {titulo}")
+            
             precios_validos = []
+            
+            # INTENTO 0: Leer el precio directo del título (Suele ser el más barato)
+            # Busca patrones como "USD 839", "USD839", "$839"
+            try:
+                match = re.search(r'(?:USD|\$)\s*([\d\.]+)', titulo)
+                if match:
+                    precio_str = match.group(1).replace('.', '')
+                    precio_titulo = int(precio_str)
+                    if precio_titulo > 500: # Filtro básico
+                        precios_validos.append(precio_titulo)
+                        print(f"   🎯 Estrategia 0 (Título) encontró: ${precio_titulo}")
+            except Exception as e:
+                print(f"   ⚠️ No pude sacar precio del título: {e}")
 
-            # --- ESTRATEGIA 1: Buscar en el Gráfico de Barras ---
+            # Si el título nos dio un precio, genial. Pero igual cargamos la web por si hay más.
+            print("⏳ Cargando página... (Esperando 8s)")
+            time.sleep(8) 
+
+            # ESTRATEGIA 1: Buscar en el Gráfico de Barras
             try:
                 barras = driver.find_elements(By.CLASS_NAME, "chart-price-text")
                 for el in barras:
                     p = limpiar_precio(el.get_attribute("textContent"))
-                    if p > 1000: precios_validos.append(p)
+                    if p > 500: precios_validos.append(p)
                 
-                if precios_validos:
-                    print(f"   📊 Estrategia 1 (Gráfico) encontró: {len(precios_validos)} precios.")
-            except Exception as e:
-                print(f"   ⚠️ Falló lectura de gráfico: {e}")
+                if barras:
+                    print(f"   📊 Estrategia 1 (Gráfico) encontró precios adicionales.")
+            except:
+                pass
 
-            # --- ESTRATEGIA 2: Buscar en la lista de tarjetas (Plan B) ---
-            # Si el gráfico falló o no cargó, buscamos abajo en la lista
+            # ESTRATEGIA 2: Buscar en la lista (Plan C)
             if not precios_validos:
-                print("   🔍 Intentando Estrategia 2 (Lista de tarjetas)...")
                 try:
-                    # Busca cualquier texto que tenga un signo '$'
-                    elementos_lista = driver.find_elements(By.XPATH, "//span[contains(text(), '$')]")
-                    
+                    elementos_lista = driver.find_elements(By.XPATH, "//span[contains(text(), '$') or contains(text(), 'USD')]")
                     for el in elementos_lista:
-                        texto = el.get_attribute("textContent")
-                        p = limpiar_precio(texto)
-                        # Filtramos precios para evitar leer basura (ej: $100)
-                        if p > 100000 and p < 10000000: 
+                        p = limpiar_precio(el.get_attribute("textContent"))
+                        if p > 500 and p < 10000000: 
                             precios_validos.append(p)
-                            
-                    print(f"   📋 Estrategia 2 (Lista) encontró: {len(precios_validos)} precios.")
-                except Exception as e:
-                    print(f"   ⚠️ Falló lectura de lista: {e}")
+                    print(f"   📋 Estrategia 2 (Lista) buscó precios.")
+                except:
+                    pass
 
-            # Si después de las dos estrategias no hay nada, saltamos
             if not precios_validos:
-                print(f"❌ FALLÓ TOTALMENTE: No pude leer ningún precio para {ciudad}.")
+                print(f"❌ FALLÓ: No encontré precio para {ciudad} ni en el título ni en la web.")
                 continue
 
-            # --- PROCESAMIENTO ---
+            # --- ELEGIR EL MEJOR ---
             mejor_precio_hoy = min(precios_validos)
-            print(f"💰 Mejor precio detectado hoy: ${mejor_precio_hoy:,}")
+            print(f"💰 MEJOR PRECIO FINAL: ${mejor_precio_hoy:,}")
 
             base_de_datos.guardar_precio("MDZ", ciudad, "FLEXIBLE", mejor_precio_hoy)
             min_historico = base_de_datos.obtener_mejor_precio_historico(ciudad)
             
-            # Lógica de Oportunidad
             if mejor_precio_hoy <= min_historico:
-                print("🔥 ¡OJO! Está en su mínimo histórico.")
-                mensajes_alerta.append(f"✅ *{ciudad}*: ${mejor_precio_hoy:,} (Récord!)")
+                print("🔥 ¡RÉCORD HISTÓRICO!")
+                mensajes_alerta.append(f"✅ *{ciudad}*: ${mejor_precio_hoy:,}")
             
             time.sleep(2)
 
