@@ -1,8 +1,9 @@
 import base_de_datos
 import notificador
 import os
-import re
 import time
+import random # <--- NUEVO: Para tiempos humanos
+import re     # <--- NUEVO: Para leer el título
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -12,30 +13,12 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # --- 1. CONFIGURACIÓN DE LA MISIÓN ---
 VUELOS_TARGET = [
-    {
-        "ciudad": "MADRID",
-        "url": "https://www.turismocity.com.ar/vuelos-baratos-a-MAD-Barajas?currency=USD&flexDates=true&from=MDZ" 
-    },
-    {
-        "ciudad": "ROMA",
-        "url": "https://www.turismocity.com.ar/vuelos-baratos-a-ROM-Roma_Italia?currency=USD&flexDates=true&from=MDZ"
-    },
-    {
-        "ciudad": "BARCELONA",
-        "url": "https://www.turismocity.com.ar/vuelos-baratos-a-BCN-Barcelona_Intl?currency=USD&flexDates=true&from=MDZ"
-    },
-    {
-        "ciudad": "LONDRES",
-        "url": "https://www.turismocity.com.ar/vuelos-baratos-a-LON-Londres_Reino_Unido?currency=USD&flexDates=true&from=MDZ"
-    },
-    {
-        "ciudad": "PARIS",
-        "url": "https://www.turismocity.com.ar/vuelos-baratos-a-PAR-Paris_Francia?currency=USD&flexDates=true&from=MDZ"
-    }
+    { "ciudad": "MADRID", "url": "https://www.turismocity.com.ar/vuelos-baratos-a-MAD-Barajas?currency=USD&flexDates=true&from=MDZ" },
+    { "ciudad": "ROMA", "url": "https://www.turismocity.com.ar/vuelos-baratos-a-ROM-Roma_Italia?currency=USD&flexDates=true&from=MDZ" },
+    { "ciudad": "BARCELONA", "url": "https://www.turismocity.com.ar/vuelos-baratos-a-BCN-Barcelona_Intl?currency=USD&flexDates=true&from=MDZ" },
+    { "ciudad": "LONDRES", "url": "https://www.turismocity.com.ar/vuelos-baratos-a-LON-Londres_Reino_Unido?currency=USD&flexDates=true&from=MDZ" },
+    { "ciudad": "PARIS", "url": "https://www.turismocity.com.ar/vuelos-baratos-a-PAR-Paris_Francia?currency=USD&flexDates=true&from=MDZ" }
 ]
-
-# --- 2. FILTROS ---
-MESES_PROHIBIDOS = ["JULIO", "JUL", "DICIEMBRE", "DIC", "DECEMBER", "JULY"]
 
 def limpiar_precio(texto_sucio):
     if not texto_sucio: return 99999999
@@ -50,32 +33,29 @@ def limpiar_precio(texto_sucio):
 
 # --- 3. EL ROBOT ---
 def run_bot():
-    print("🤖 INICIANDO VIBE TRAVEL BOT - MODO MULTI-DESTINO")
+    print("🤖 INICIANDO VIBE TRAVEL BOT - MODO ANTI-CLOUDFLARE 🛡️")
     
-    # --- CONFIGURACIÓN CHROME (MODO NUBE CAMUFLADO) ---
+    # --- CONFIGURACIÓN CHROME CAMUFLADO ---
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless") # No abrir ventana
+    options.add_argument("--headless") 
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     
-    # 🎭 EL DISFRAZ (Clave para que no nos bloqueen)
-    # 1. User-Agent: Decimos que somos un Windows 10 común y corriente
+    # Disfraz de Humano
     user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     options.add_argument(f"user-agent={user_agent}")
-    
-    # 2. Idioma: Decimos que hablamos Español de Argentina (importante para los precios)
     options.add_argument("--lang=es-AR")
     
-    # 3. Ocultar que es automatizado (Truco avanzado)
+    # Trucos para ocultar que es automatizado
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
-    # Ejecutar script para engañar a las protecciones de JavaScript
+    # Truco JavaScript extra para ocultar Selenium
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     
     mensajes_alerta = [] 
@@ -85,62 +65,67 @@ def run_bot():
             ciudad = objetivo["ciudad"]
             url = objetivo["url"]
             
-            print(f"\n✈️  Destino: {ciudad} (Saliendo de MDZ)")
-            
+            # PAUSA HUMANIZADA ENTRE CIUDADES (Para no saturar y parecer humano)
+            tiempo_espera = random.uniform(3, 7)
+            print(f"\n💤 Descansando {tiempo_espera:.1f}s antes de ir a {ciudad}...")
+            time.sleep(tiempo_espera)
+
+            print(f"✈️  Destino: {ciudad}")
             driver.get(url)
             
-            # --- DEBUG Y ESTRATEGIA 0 (EL TÍTULO) ---
+            # --- LÓGICA ANTI-BLOQUEO "JUST A MOMENT" ---
             titulo = driver.title
-            print(f"   👀 Título detectado: {titulo}")
+            if "Just a moment" in titulo or "Attention Required" in titulo:
+                print("🛡️ Cloudflare nos frenó. Esperando 15s a que nos deje pasar...")
+                time.sleep(15) # Esperamos a que la sala de espera nos redirija automáticamente
+                titulo = driver.title # Volvemos a leer el título
+            
+            print(f"   👀 Título Final: {titulo}")
             
             precios_validos = []
             
-            # INTENTO 0: Leer el precio directo del título (Suele ser el más barato)
-            # Busca patrones como "USD 839", "USD839", "$839"
+            # ESTRATEGIA 0: El Título (La más efectiva)
             try:
+                # Busca patrones como "USD 1.200" o "$1200" o "USD1200" en el título de la pestaña
                 match = re.search(r'(?:USD|\$)\s*([\d\.]+)', titulo)
                 if match:
                     precio_str = match.group(1).replace('.', '')
                     precio_titulo = int(precio_str)
-                    if precio_titulo > 500: # Filtro básico
+                    if precio_titulo > 500: 
                         precios_validos.append(precio_titulo)
                         print(f"   🎯 Estrategia 0 (Título) encontró: ${precio_titulo}")
             except Exception as e:
-                print(f"   ⚠️ No pude sacar precio del título: {e}")
+                print(f"   ⚠️ Error leyendo título: {e}")
 
-            # Si el título nos dio un precio, genial. Pero igual cargamos la web por si hay más.
-            print("⏳ Cargando página... (Esperando 8s)")
-            time.sleep(8) 
-
-            # ESTRATEGIA 1: Buscar en el Gráfico de Barras
-            try:
-                barras = driver.find_elements(By.CLASS_NAME, "chart-price-text")
-                for el in barras:
-                    p = limpiar_precio(el.get_attribute("textContent"))
-                    if p > 500: precios_validos.append(p)
-                
-                if barras:
-                    print(f"   📊 Estrategia 1 (Gráfico) encontró precios adicionales.")
-            except:
-                pass
-
-            # ESTRATEGIA 2: Buscar en la lista (Plan C)
+            # Si el título falló, cargamos la web completa
             if not precios_validos:
+                print("⏳ Título sin precio. Cargando web completa (Esperando 8s)...")
+                time.sleep(8) 
+
+                # ESTRATEGIA 1: Gráfico
                 try:
-                    elementos_lista = driver.find_elements(By.XPATH, "//span[contains(text(), '$') or contains(text(), 'USD')]")
-                    for el in elementos_lista:
+                    barras = driver.find_elements(By.CLASS_NAME, "chart-price-text")
+                    for el in barras:
                         p = limpiar_precio(el.get_attribute("textContent"))
-                        if p > 500 and p < 10000000: 
-                            precios_validos.append(p)
-                    print(f"   📋 Estrategia 2 (Lista) buscó precios.")
-                except:
-                    pass
+                        if p > 500: precios_validos.append(p)
+                    if barras: print(f"   📊 Estrategia 1 (Gráfico) encontró precios.")
+                except: pass
+
+                # ESTRATEGIA 2: Lista (Plan C)
+                if not precios_validos:
+                    try:
+                        lista = driver.find_elements(By.XPATH, "//span[contains(text(), '$') or contains(text(), 'USD')]")
+                        for el in lista:
+                            p = limpiar_precio(el.get_attribute("textContent"))
+                            if p > 500 and p < 10000000: precios_validos.append(p)
+                        if lista: print(f"   📋 Estrategia 2 (Lista) buscó precios.")
+                    except: pass
 
             if not precios_validos:
-                print(f"❌ FALLÓ: No encontré precio para {ciudad} ni en el título ni en la web.")
+                print(f"❌ FALLÓ: Cloudflare ganó esta ronda en {ciudad}.")
                 continue
 
-            # --- ELEGIR EL MEJOR ---
+            # --- PROCESAMIENTO ---
             mejor_precio_hoy = min(precios_validos)
             print(f"💰 MEJOR PRECIO FINAL: ${mejor_precio_hoy:,}")
 
@@ -150,20 +135,18 @@ def run_bot():
             if mejor_precio_hoy <= min_historico:
                 print("🔥 ¡RÉCORD HISTÓRICO!")
                 mensajes_alerta.append(f"✅ *{ciudad}*: ${mejor_precio_hoy:,}")
-            
-            time.sleep(2)
 
         # --- REPORTE FINAL ---
         if mensajes_alerta:
-            print("\n🚨 MANDANDO RESUMEN A MAMÁ...")
-            cuerpo_mensaje = "\n".join(mensajes_alerta)
-            texto_ws = f"🤖 *VibeTravel Report* ✈️\nOrigen: Mendoza\n\n{cuerpo_mensaje}\n\n¡Entrá a la web para ver fechas!"
-            notificador.enviar_mensaje(texto_ws)
+            print("\n🚨 MANDANDO NOTIFICACIÓN...")
+            cuerpo = "\n".join(mensajes_alerta)
+            texto = f"🤖 *VibeTravel Report* ✈️\nOrigen: Mendoza\n\n{cuerpo}\n\n¡Mirá la web para más detalles!"
+            notificador.enviar_mensaje(texto)
         else:
-            print("\n💤 Nada interesante hoy en ningún destino.")
+            print("\n💤 Nada interesante hoy.")
 
     except Exception as e:
-        print(f"🔥 Error Crítico del Bot: {e}")
+        print(f"🔥 Error Crítico: {e}")
     finally:
         driver.quit()
 
